@@ -8,7 +8,7 @@ import io
 app = FastAPI()
 
 # COLE SUA API KEY AQUI (Para teste rápido) ou use Variáveis de Ambiente
-GOOGLE_API_KEY = "SUA_CHAVE_AQUI"
+GOOGLE_API_KEY = "AIzaSyBivenejBRrYM8iSkxqM5BVZCAFnnQ7b-E"
 genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
