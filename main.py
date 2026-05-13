@@ -1,16 +1,20 @@
 import os
+import io
+import PIL.Image
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 import google.generativeai as genai
-import PIL.Image
-import io
 
-app = FastAPI()
+app = FastAPI(title="CheckApp Pro")
 
-# Mantenha sua API KEY configurada aqui
-GOOGLE_API_KEY = "AIzaSyBivenejBRrYM8iSkxqM5BVZCAFnnQ7b-E"
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# --- CONFIGURAÇÃO DA IA ---
+# O sistema busca a chave nas variáveis de ambiente do Render (Seguro e Profissional)
+api_key = os.environ.get("GOOGLE_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    model = None
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -20,31 +24,42 @@ async def home():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>CheckApp | Sistema Completo</title>
+        <title>CheckApp | O Futuro dos Exames</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
         <style>
-            body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-            .gradient-bg { background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 100%); }
+            body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+            .gradient-bg { background: linear-gradient(135deg, #1e1b4b 0%, #d946ef 100%); }
+            .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+            .btn-gradient { background: linear-gradient(135deg, #1e1b4b 0%, #d946ef 100%); transition: transform 0.2s; }
+            .btn-gradient:hover { transform: scale(1.02); }
         </style>
     </head>
-    <body>
-        <nav class="bg-white border-b p-4 shadow-sm">
-            <div class="max-w-4xl mx-auto flex justify-between items-center">
-                <span class="font-bold text-xl text-indigo-900">CheckApp <span class="text-xs text-indigo-400">PRO DEMO</span></span>
-                <div class="space-x-2">
-                    <button onclick="switchTab('paciente')" class="px-4 py-2 font-medium text-indigo-600 bg-indigo-50 rounded-lg">Paciente</button>
-                    <button onclick="switchTab('laboratorio')" class="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Laboratório</button>
-                </div>
-            </div>
-        </nav>
+    <body class="min-h-screen">
 
-        <main class="max-w-3xl mx-auto p-6">
-            <div id="tab-paciente">
-                <div class="bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
-                    <h2 class="text-xl font-bold mb-6">Busca de Exames</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <input id="cep" type="text" placeholder="CEP (ex: 01001-000)" class="p-4 border rounded-xl">
-                        <select id="exame-manual" class="p-4 border rounded-xl bg-white">
+        <header class="gradient-bg text-white p-6 shadow-lg">
+            <div class="max-w-4xl mx-auto flex justify-between items-center">
+                <h1 class="text-3xl font-black tracking-tight">Check<span class="text-pink-300">App</span></h1>
+                <nav class="space-x-4">
+                    <button onclick="showTab('paciente')" class="hover:text-pink-200 font-bold">Paciente</button>
+                    <button onclick="showTab('laboratorio')" class="hover:text-pink-200 font-bold">Laboratório</button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="max-w-4xl mx-auto p-6 -mt-10">
+            
+            <div id="tab-paciente" class="glass-card rounded-3xl shadow-2xl p-8 border border-slate-100">
+                <h2 class="text-2xl font-bold text-slate-800 mb-6">Solicitação de Exames</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase">CEP do Atendimento</label>
+                        <input id="cep" type="text" placeholder="00000-000" class="w-full mt-2 p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase">Selecione o Exame</label>
+                        <select id="exame-manual" class="w-full mt-2 p-4 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-pink-500 outline-none">
                             <option value="Hemograma">Hemograma Completo</option>
                             <option value="Vitamina D">Vitamina D</option>
                             <option value="Glicemia">Glicemia de Jejum</option>
@@ -54,55 +69,82 @@ async def home():
                             <option value="Raio-X">Raio-X Tórax</option>
                         </select>
                     </div>
-                    <label for="foto-receita" class="block w-full border-2 border-dashed border-indigo-300 p-6 rounded-2xl text-center cursor-pointer hover:border-indigo-500">
-                        📸 Selecionar/Tirar foto do pedido médico
-                        <input type="file" id="foto-receita" class="hidden" accept="image/*" onchange="processarIA()">
+                </div>
+
+                <div class="border-2 border-dashed border-indigo-200 rounded-2xl p-8 text-center bg-indigo-50/50 hover:border-pink-400 transition cursor-pointer">
+                    <input type="file" id="foto-receita" class="hidden" accept="image/*" onchange="processarIA()">
+                    <label for="foto-receita" class="cursor-pointer">
+                        <span class="block text-4xl mb-2">📸</span>
+                        <span class="font-bold text-indigo-900">Upload da Receita Médica</span>
+                        <p class="text-xs text-slate-500 mt-1">Nossa IA lê sua receita em segundos</p>
                     </label>
-                    <div id="loading" class="hidden mt-4 text-indigo-600 font-bold text-center animate-pulse">Analisando receita...</div>
-                    <div id="resultado" class="hidden mt-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                        Exame detectado: <span id="exame-detectado" class="font-bold"></span>
+                </div>
+
+                <div id="loading" class="hidden mt-8 text-center py-4 bg-indigo-50 rounded-xl text-indigo-700 font-bold animate-pulse">
+                    Conectando com o Gemini... Analisando imagem...
+                </div>
+
+                <div id="resultado" class="hidden mt-8 p-6 bg-emerald-50 rounded-2xl border border-emerald-200">
+                    <p class="text-sm text-emerald-800 font-bold uppercase tracking-wider">Exame Identificado:</p>
+                    <p id="exame-nome" class="text-3xl font-black text-emerald-900 mt-1">---</p>
+                    <div class="mt-4 pt-4 border-t border-emerald-200 flex justify-between items-center">
+                        <span class="text-sm text-emerald-700">Preço com desconto:</span>
+                        <span class="text-2xl font-black text-emerald-600">R$ 145,00</span>
                     </div>
                 </div>
             </div>
 
-            <div id="tab-laboratorio" class="hidden">
-                <div class="bg-slate-900 text-white rounded-3xl p-8 shadow-2xl">
-                    <h2 class="text-xl font-bold mb-6">Painel de Configurações (Laboratório)</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Margem máxima de desconto (%)</label>
-                            <input id="desconto" type="number" value="20" class="w-full bg-slate-800 p-3 rounded-lg border border-slate-700">
+            <div id="tab-laboratorio" class="hidden glass-card rounded-3xl shadow-2xl p-8 border border-slate-100">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">Painel de Controle B2B</h2>
+                <p class="text-slate-500 mb-8">Gerencie sua ociosidade de agenda.</p>
+                
+                <div class="space-y-6">
+                    <div class="p-6 bg-slate-900 rounded-2xl text-white">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-400">Margem Max de Desconto (%)</label>
+                                <input id="lab-desconto" type="number" value="30" class="w-full mt-1 bg-slate-800 p-3 rounded-lg border border-slate-700 text-white font-bold">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400">Horário Ocioso</label>
+                                <input id="lab-horario" type="text" value="13:00 - 17:00" class="w-full mt-1 bg-slate-800 p-3 rounded-lg border border-slate-700 text-white font-bold">
+                            </div>
                         </div>
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Horários de "Agenda Ociosa"</label>
-                            <input id="horarios" type="text" value="13:00 - 17:00" class="w-full bg-slate-800 p-3 rounded-lg border border-slate-700">
-                        </div>
-                        <button onclick="salvarConfig()" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg mt-4 hover:bg-emerald-700">SALVAR CONFIGURAÇÕES</button>
-                        <p id="msg-sucesso" class="text-emerald-400 text-sm mt-2 hidden text-center">Configurações salvas com sucesso!</p>
+                        <button onclick="salvarConfig()" class="w-full mt-6 bg-pink-600 text-white font-bold py-4 rounded-xl hover:bg-pink-700 transition">SALVAR REGRAS DE NEGÓCIO</button>
+                        <p id="save-msg" class="hidden mt-3 text-emerald-400 text-center font-bold">Regras salvas na nuvem!</p>
                     </div>
                 </div>
             </div>
         </main>
 
         <script>
-            function switchTab(t) {
-                document.getElementById('tab-paciente').style.display = t === 'paciente' ? 'block' : 'none';
-                document.getElementById('tab-laboratorio').style.display = t === 'laboratorio' ? 'block' : 'none';
+            function showTab(tab) {
+                document.getElementById('tab-paciente').style.display = tab === 'paciente' ? 'block' : 'none';
+                document.getElementById('tab-laboratorio').style.display = tab === 'laboratorio' ? 'block' : 'none';
             }
             function salvarConfig() {
-                document.getElementById('msg-sucesso').classList.remove('hidden');
-                setTimeout(() => document.getElementById('msg-sucesso').classList.add('hidden'), 2000);
+                document.getElementById('save-msg').classList.remove('hidden');
+                setTimeout(() => document.getElementById('save-msg').classList.add('hidden'), 3000);
             }
             async function processarIA() {
                 const input = document.getElementById('foto-receita');
                 if (!input.files[0]) return;
                 document.getElementById('loading').classList.remove('hidden');
-                const fd = new FormData(); fd.append('file', input.files[0]);
-                const res = await fetch('/ia-scan', { method: 'POST', body: fd });
-                const data = await res.json();
-                document.getElementById('loading').classList.add('hidden');
-                document.getElementById('resultado').classList.remove('hidden');
-                document.getElementById('exame-detectado').innerText = data.exame;
+                document.getElementById('resultado').classList.add('hidden');
+                
+                const fd = new FormData();
+                fd.append('file', input.files[0]);
+
+                try {
+                    const res = await fetch('/ia-scan', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('resultado').classList.remove('hidden');
+                    document.getElementById('exame-nome').innerText = data.exame;
+                } catch (e) {
+                    alert("Erro na leitura. Tente novamente.");
+                    document.getElementById('loading').classList.add('hidden');
+                }
             }
         </script>
     </body>
@@ -111,12 +153,14 @@ async def home():
 
 @app.post("/ia-scan")
 async def scan_receita(file: UploadFile = File(...)):
+    if not model:
+        return {"exame": "ERRO: CHAVE API NÃO CONFIGURADA"}
+    
     try:
         contents = await file.read()
         img = PIL.Image.open(io.BytesIO(contents))
-        # PROMPT MELHORADO E MAIS ESPECÍFICO
-        prompt = "Analise esta imagem de pedido médico. Identifique o nome do exame. Retorne APENAS o nome em MAIÚSCULAS. Se não encontrar, retorne 'EXAME NÃO IDENTIFICADO'."
+        prompt = "Analise o pedido médico e identifique o exame principal. Responda APENAS o nome do exame em MAIÚSCULAS. Se for exame de imagem (Ressonância, Tomografia, USG), identifique também. Resposta curta."
         response = model.generate_content([prompt, img])
         return {"exame": response.text.strip()}
     except Exception as e:
-        return {"exame": "Erro ao ler imagem. Tente outra."}
+        return {"exame": "NÃO FOI POSSÍVEL LER A IMAGEM"}
